@@ -1,0 +1,4 @@
+version: 2
+models:
+  - name: int_events_enriched
+    description: Event-to-user enrichment, inlined by dbt and embedded in deployed Athena SQL.

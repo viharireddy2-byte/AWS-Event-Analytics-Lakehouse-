@@ -1,0 +1,11 @@
+version: 2
+sources:
+  - name: raw
+    schema: "{{ env_var('GLUE_DATABASE') }}"
+    tables:
+      - name: events
+        loaded_at_field: "CAST(from_iso8601_timestamp(timestamp) AS timestamp)"
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+      - name: users

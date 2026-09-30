@@ -1,0 +1,38 @@
+{
+  "scope": "SQLite reference semantics; AWS integration not executed",
+  "users": 6,
+  "events": 24,
+  "replay_identical": true,
+  "analytics": [
+    {
+      "event_type": "click",
+      "events": 4,
+      "amount": 0.0
+    },
+    {
+      "event_type": "login",
+      "events": 4,
+      "amount": 0.0
+    },
+    {
+      "event_type": "logout",
+      "events": 4,
+      "amount": 0.0
+    },
+    {
+      "event_type": "page_view",
+      "events": 4,
+      "amount": 0.0
+    },
+    {
+      "event_type": "purchase",
+      "events": 4,
+      "amount": 0.44
+    },
+    {
+      "event_type": "signup",
+      "events": 4,
+      "amount": 0.0
+    }
+  ]
+}

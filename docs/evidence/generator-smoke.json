@@ -1,0 +1,11 @@
+{
+  "events": 1000000,
+  "users": 100000,
+  "files": 13,
+  "partitioned_by": [
+    "event_date"
+  ],
+  "seconds": 6.896,
+  "peak_rss_kib": 18896,
+  "scope": "Local generation only; no AWS pipeline benchmark"
+}

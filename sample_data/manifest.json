@@ -1,0 +1,18 @@
+{
+  "format": "ndjson",
+  "events": 24,
+  "users": 6,
+  "start_id": 1,
+  "files": [
+    {
+      "path": "raw/users/part-000000.json",
+      "rows": 6,
+      "sha256": "04545b4e078be73ddfdefd809787d95255515fbc0f0b54f23f7f30e5e4b49a80"
+    },
+    {
+      "path": "raw/events/part-000000.json",
+      "rows": 24,
+      "sha256": "cccaaf37387cda5ca762c8efd2e8e5d2a4234ac0a49d8f3ba91e90987f2d0d37"
+    }
+  ]
+}

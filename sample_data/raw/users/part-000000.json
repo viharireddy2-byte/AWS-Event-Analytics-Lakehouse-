@@ -1,0 +1,6 @@
+{"user_id":"u0000000001","name":"User 1","email":"user1@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"US"}
+{"user_id":"u0000000002","name":"User 2","email":"user2@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"IN"}
+{"user_id":"u0000000003","name":"User 3","email":"user3@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"GB"}
+{"user_id":"u0000000004","name":"User 4","email":"user4@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"CA"}
+{"user_id":"u0000000005","name":"User 5","email":"user5@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"DE"}
+{"user_id":"u0000000006","name":"User 6","email":"user6@example.com","created_at":"2024-01-01T00:00:00+00:00","country":"US"}

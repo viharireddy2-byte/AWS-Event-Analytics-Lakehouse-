@@ -1,0 +1,45 @@
+version: 2
+models:
+  - name: dim_users
+    description: "Aurora marts contract; invalid source rows are never silently filtered."
+    columns:
+      - name: user_id
+        tests:
+          - not_null
+          - unique
+      - name: username
+        tests:
+          - not_null
+      - name: email
+        tests:
+          - not_null
+          - unique
+      - name: created_at
+        tests:
+          - not_null
+  - name: fct_events
+    description: "Aurora marts contract; invalid source rows are never silently filtered."
+    columns:
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_users')
+                field: user_id
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['page_view', 'click', 'purchase', 'signup', 'login', 'logout']
+      - name: event_timestamp
+        tests:
+          - not_null
+      - name: event_date
+        tests:
+          - not_null

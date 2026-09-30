@@ -1,4 +1,4 @@
-# Aurora Lakehouse - AWS Event Analytics Lakehouse
+# Aurora Lakehouse
 
 An AWS event analytics lakehouse with managed orchestration, durable Apache
 Iceberg tables, and quality gates that prevent invalid data from being merged

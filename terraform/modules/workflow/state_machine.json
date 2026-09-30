@@ -1,0 +1,565 @@
+{
+  "Comment": "Aurora event lakehouse workflow",
+  "TimeoutSeconds": 7200,
+  "StartAt": "NormalizeInput",
+  "States": {
+    "AcquireLock": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "acquire_lock",
+          "execution_id.$": "$$.Execution.Id",
+          "window.$": "$.config.window",
+          "partitioned_source.$": "$.config.partitioned_source"
+        }
+      },
+      "ResultPath": "$.lease",
+      "Next": "RecordPipelineStart",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "RecordPipelineStart": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "${MetadataTableName}",
+        "Item": {
+          "pipeline_name": {
+            "S": "aurora_raw_to_curated"
+          },
+          "execution_date": {
+            "S.$": "$$.Execution.StartTime"
+          },
+          "execution_id": {
+            "S.$": "$$.Execution.Id"
+          },
+          "status": {
+            "S": "RUNNING"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Next": "StartRawCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ]
+    },
+    "StartRawCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${RawCrawlerName}"
+      },
+      "ResultPath": null,
+      "Next": "WaitForRawCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ]
+    },
+    "WaitForRawCrawler": {
+      "Type": "Wait",
+      "Seconds": 15,
+      "Next": "CheckRawCrawler"
+    },
+    "CheckRawCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${RawCrawlerName}"
+      },
+      "ResultPath": "$.crawler",
+      "Next": "IsRawCrawlerReady",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ]
+    },
+    "IsRawCrawlerReady": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.crawler.Crawler.State",
+          "StringEquals": "READY",
+          "Next": "ValidateRawCrawler"
+        }
+      ],
+      "Default": "WaitForRawCrawler"
+    },
+    "ValidateRawCrawler": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.crawler.Crawler.LastCrawl.Status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "RunDbtStaging"
+        }
+      ],
+      "Default": "CrawlerFailed"
+    },
+    "StartCuratedCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${CuratedCrawlerName}"
+      },
+      "ResultPath": null,
+      "Next": "WaitForCuratedCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ]
+    },
+    "WaitForCuratedCrawler": {
+      "Type": "Wait",
+      "Seconds": 15,
+      "Next": "CheckCuratedCrawler"
+    },
+    "CheckCuratedCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${CuratedCrawlerName}"
+      },
+      "ResultPath": "$.crawler",
+      "Next": "IsCuratedCrawlerReady",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ]
+    },
+    "IsCuratedCrawlerReady": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.crawler.Crawler.State",
+          "StringEquals": "READY",
+          "Next": "ValidateCuratedCrawler"
+        }
+      ],
+      "Default": "WaitForCuratedCrawler"
+    },
+    "ValidateCuratedCrawler": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.crawler.Crawler.LastCrawl.Status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "RunMartTests"
+        }
+      ],
+      "Default": "CrawlerFailed"
+    },
+    "CrawlerFailed": {
+      "Type": "Pass",
+      "Result": {
+        "Cause": "Glue crawler did not succeed"
+      },
+      "ResultPath": "$.error",
+      "Next": "RecordPipelineFailure"
+    },
+    "RunDbtStaging": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "run_layer",
+          "execution_id.$": "$$.Execution.Id",
+          "layer": "staging",
+          "window.$": "$.lease.Payload.window",
+          "partitioned_source.$": "$.lease.Payload.partitioned_source"
+        }
+      },
+      "ResultPath": null,
+      "Next": "RunStagingTests",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "RunStagingTests": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtTestExecutorLambdaArn}",
+        "Payload": {
+          "action": "run_tests",
+          "execution_id.$": "$$.Execution.Id",
+          "layer": "staging",
+          "window.$": "$.lease.Payload.window"
+        }
+      },
+      "ResultPath": null,
+      "Next": "RunDbtMarts",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "RunDbtMarts": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "run_layer",
+          "execution_id.$": "$$.Execution.Id",
+          "layer": "marts",
+          "window.$": "$.lease.Payload.window"
+        }
+      },
+      "ResultPath": null,
+      "Next": "StartCuratedCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "RunMartTests": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtTestExecutorLambdaArn}",
+        "Payload": {
+          "action": "run_tests",
+          "execution_id.$": "$$.Execution.Id",
+          "layer": "marts",
+          "window.$": "$.lease.Payload.window"
+        }
+      },
+      "ResultPath": null,
+      "Next": "PublishDataset",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "RecordPipelineSuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "${MetadataTableName}",
+        "Key": {
+          "pipeline_name": {
+            "S": "aurora_raw_to_curated"
+          },
+          "execution_date": {
+            "S.$": "$$.Execution.StartTime"
+          }
+        },
+        "UpdateExpression": "SET #s = :s, end_time = :end",
+        "ExpressionAttributeNames": {
+          "#s": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":s": {
+            "S": "SUCCEEDED"
+          },
+          ":end": {
+            "S.$": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Next": "PipelineSucceeded",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "ReleaseFailureLock"
+        }
+      ]
+    },
+    "RecordPipelineFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "${MetadataTableName}",
+        "Key": {
+          "pipeline_name": {
+            "S": "aurora_raw_to_curated"
+          },
+          "execution_date": {
+            "S.$": "$$.Execution.StartTime"
+          }
+        },
+        "UpdateExpression": "SET #s = :s, end_time = :end, error_message = :error",
+        "ExpressionAttributeNames": {
+          "#s": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":s": {
+            "S": "FAILED"
+          },
+          ":end": {
+            "S.$": "$$.State.EnteredTime"
+          },
+          ":error": {
+            "S.$": "States.JsonToString($.error)"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Next": "ReleaseFailureLock",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "ReleaseFailureLock"
+        }
+      ]
+    },
+    "ReleaseSuccessLock": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "release_lock",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultPath": null,
+      "Next": "RecordPipelineSuccess",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "ReleaseFailureLock": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "release_lock",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultPath": null,
+      "Next": "PipelineFailed",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "PipelineSucceeded": {
+      "Type": "Succeed"
+    },
+    "PipelineFailed": {
+      "Type": "Fail",
+      "Error": "AuroraPipelineFailure",
+      "Cause": "See execution history and pipeline metadata for details."
+    },
+    "NormalizeInput": {
+      "Type": "Pass",
+      "Parameters": {
+        "defaults": {
+          "window": null,
+          "partitioned_source": false
+        },
+        "input.$": "$"
+      },
+      "Next": "MergeInput"
+    },
+    "MergeInput": {
+      "Type": "Pass",
+      "Parameters": {
+        "config.$": "States.JsonMerge($.defaults, $.input, false)"
+      },
+      "Next": "AcquireLock"
+    },
+    "PublishDataset": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DbtExecutorLambdaArn}",
+        "Payload": {
+          "action": "publish",
+          "execution_id.$": "$$.Execution.Id",
+          "window.$": "$.lease.Payload.window"
+        }
+      },
+      "ResultPath": null,
+      "Next": "ReleaseSuccessLock",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "RecordPipelineFailure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    }
+  }
+}
