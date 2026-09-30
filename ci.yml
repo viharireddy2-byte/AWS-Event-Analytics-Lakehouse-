@@ -1,0 +1,54 @@
+name: validate
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pyyaml
+      - run: python -m compileall -q dags data scripts terraform/modules/workflow/lambda
+      - run: python scripts/check_repository.py --tracked
+      - run: python scripts/check_model_parity.py
+      - run: python scripts/generate_test_report.py
+      - run: python scripts/local_demo.py
+      - run: cp dbt_project/profiles.yml.example dbt_project/profiles.yml
+      - run: dbt deps --project-dir dbt_project --profiles-dir dbt_project
+        env:
+          GLUE_DATABASE: aurora_ci_lakehouse
+          ATHENA_WORKGROUP: aurora-ci
+          DATA_LAKE_BUCKET: aurora-ci-data-lake
+      - run: dbt parse --no-partial-parse --project-dir dbt_project --profiles-dir dbt_project
+        env:
+          GLUE_DATABASE: aurora_ci_lakehouse
+          ATHENA_WORKGROUP: aurora-ci
+          DATA_LAKE_BUCKET: aurora-ci-data-lake
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8'
+      - run: terraform -chdir=terraform fmt -check -recursive
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-validation
+          path: |
+            .generated/validation.json
+            .generated/demo.json
+  airflow-dag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-airflow.txt
+      - run: python scripts/validate_dag.py
+        env:
+          AIRFLOW_HOME: /tmp/aurora-airflow
+          AIRFLOW__CORE__LOAD_EXAMPLES: 'False'

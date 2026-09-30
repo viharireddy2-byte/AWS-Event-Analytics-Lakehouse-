@@ -1,0 +1,12 @@
+aurora:
+  target: dev
+  outputs:
+    dev:
+      type: athena
+      region_name: "{{ env_var('AWS_REGION', 'us-east-1') }}"
+      database: awsdatacatalog
+      schema: "{{ env_var('GLUE_DATABASE') }}"
+      work_group: "{{ env_var('ATHENA_WORKGROUP') }}"
+      s3_staging_dir: "s3://{{ env_var('DATA_LAKE_BUCKET') }}/athena-results/"
+      s3_data_dir: "s3://{{ env_var('DATA_LAKE_BUCKET') }}/curated/"
+      threads: 2

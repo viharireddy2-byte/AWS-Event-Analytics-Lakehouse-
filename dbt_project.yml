@@ -1,0 +1,22 @@
+name: aurora_lakehouse
+version: '1.0.0'
+config-version: 2
+profile: aurora
+model-paths: [models]
+macro-paths: [macros]
+test-paths: [tests]
+seed-paths: [seeds]
+clean-targets: [target, dbt_packages]
+models:
+  aurora_lakehouse:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: incremental
+      +incremental_strategy: merge
+      +table_type: iceberg
+      +format: parquet
+      +write_compression: snappy
+      +on_schema_change: fail
