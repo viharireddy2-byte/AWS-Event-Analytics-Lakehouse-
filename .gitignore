@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.terraform/
+*.tfstate*
+*.tfplan
+terraform/modules/workflow/lambda/*.zip
+*.auto.tfvars
+.env
+.generated/
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+dbt_project/profiles.yml
+terraform/modules/workflow/runtime.zip
