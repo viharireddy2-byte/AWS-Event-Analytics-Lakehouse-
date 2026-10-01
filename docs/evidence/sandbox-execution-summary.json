@@ -1,0 +1,37 @@
+{
+  "environment": "AWS sandbox",
+  "source": "Project owner supplied execution results",
+  "full_run": {
+    "events_processed": 50000000,
+    "users_processed": 1000000,
+    "duration_minutes": 25
+  },
+  "one_day_replay": {
+    "raw_event_source_scan_before": {
+      "value": 11.5,
+      "unit": "GB",
+      "approximate": true
+    },
+    "raw_event_source_scan_after": {
+      "value": 140,
+      "unit": "MB",
+      "approximate": true
+    },
+    "duration_before_minutes": 20,
+    "duration_after_minutes": 14,
+    "duration_reduction_percent": 30,
+    "historical_validation_running": true,
+    "scan_scope": "Raw event source only"
+  },
+  "regression_tests": {
+    "passed": 49,
+    "source": "validation.json"
+  },
+  "run_metadata": {
+    "execution_date": null,
+    "aws_region": null,
+    "resource_sizing": null,
+    "execution_arns": null,
+    "query_ids": null
+  }
+}
