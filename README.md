@@ -1,4 +1,4 @@
-# Aurora Lakehouse
+# AWS Event Analytics Lakehouse - Aurora Lakehouse
 
 An AWS event analytics lakehouse with managed orchestration, durable Apache
 Iceberg tables, and quality gates that prevent invalid data from being merged
@@ -9,10 +9,26 @@ dimension and enriched event fact table. Airflow schedules the pipeline;
 Step Functions owns execution state; Python Lambda functions submit SQL to
 Athena engine 3. Glue catalogs the lake and DynamoDB stores run metadata.
 
-**Validation status:** offline regression tests and Terraform schema validation
-are provided. AWS end-to-end acceptance and the 50-million-event benchmark
-must be run in your account. No throughput, latency, uptime or cost result is
-claimed without a measured benchmark. See [validation](docs/validation.md).
+## Sandbox execution results
+
+In the project owner's sandbox evaluation, the pipeline processed **50 million
+events and one million users in 25 minutes**.
+
+| Metric | Before partition pruning | After partition pruning |
+|---|---|---|
+| One-day replay: raw event-source scan | Approximately 11.5 GB | Approximately 140 MB |
+| One-day replay: end-to-end duration | 20 minutes | 14 minutes |
+
+Replay duration decreased by **30%**, with historical validation still running.
+Scan figures apply to the raw event source, not total pipeline scanning or cost.
+These results describe the reported sandbox runs, not a throughput guarantee.
+
+The attached regression report records **49 passing tests** covering runtime
+behavior, quality gates, publication, partition pruning, and lock recovery.
+See [execution summary](docs/evidence/sandbox-execution-summary.json) and
+[regression output](docs/evidence/validation.json). Execution metrics were supplied
+by the project owner; AWS region, resource sizing, execution ARNs, and query IDs
+were not included in the supplied run summary.
 
 ## Architecture
 
