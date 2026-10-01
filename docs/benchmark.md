@@ -1,8 +1,31 @@
 # Reproducible scale benchmark
 
-50 million is a dataset target, not a proven throughput result. Use isolated
-1M, 10M and 50M datasets, starting with the tiny fixture. Freeze producer writes
-and use a dedicated workgroup. Do not mix independent full user snapshots.
+## Sandbox execution results
+
+In the project owner's sandbox evaluation, the pipeline processed **50 million
+events and one million users in 25 minutes**.
+
+| Metric | Before partition pruning | After partition pruning |
+|---|---|---|
+| One-day replay: raw event-source scan | Approximately 11.5 GB | Approximately 140 MB |
+| One-day replay: end-to-end duration | 20 minutes | 14 minutes |
+
+Replay duration decreased by **30%**, with historical validation still running.
+Scan figures apply to the raw event source, not total pipeline scanning or cost.
+These results describe the reported sandbox runs, not a throughput guarantee.
+
+The attached regression report records **49 passing tests** covering runtime
+behavior, quality gates, publication, partition pruning, and lock recovery.
+See [execution summary](evidence/sandbox-execution-summary.json) and
+[regression output](evidence/validation.json). Execution metrics were supplied
+by the project owner; AWS region, resource sizing, execution ARNs, and query IDs
+were not included in the supplied run summary.
+
+## Reproduce and capture future runs
+
+Use isolated 1M, 10M and 50M datasets, starting with the tiny fixture. Freeze
+producer writes and use a dedicated workgroup. Do not mix independent full
+user snapshots.
 
 ```bash
 python data/generate_large_dataset.py --events 50000000 --users 1000000 --output .generated/scale
