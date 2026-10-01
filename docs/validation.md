@@ -1,4 +1,4 @@
-# Validation evidence for version 1.1
+# Validation evidence and sandbox execution results
 
 See [machine-readable summary](validation-evidence.json),
 [regression output](evidence/validation.json), [demo results](evidence/demo.json)
@@ -16,8 +16,9 @@ and [generator smoke measurement](evidence/generator-smoke.json).
 | Local demo | 6 users, 24 events, identical all-value replay; purchase sum 0.44 |
 | Partitioned generator smoke | 1,000,000 events, 100,000 users, 13 shards |
 | Generator measurement | 6.896 seconds, peak RSS 18,896 KiB in this environment |
-| AWS deployment, SQL execution and failure/recovery drills | Not executed |
-| 50-million-event AWS benchmark | Not executed |
+| AWS sandbox execution | Project owner reports 50M events and 1M users processed in 25 minutes |
+| AWS failure/recovery drills | Not included in the supplied sandbox summary |
+| One-day replay | Raw event-source scan approximately 11.5 GB → 140 MB; end-to-end 20 → 14 minutes; historical validation retained |
 | Remote GitHub Actions execution | Not executed |
 
 Runtime tests/compilation used the Lambda target Python major/minor (3.11).
@@ -38,3 +39,7 @@ Regenerate local evidence with `python scripts/generate_test_report.py`,
 `python scripts/local_demo.py`, `python scripts/check_model_parity.py` and
 `python scripts/check_repository.py`. Run the [AWS acceptance](deployment.md)
 and [benchmark](benchmark.md) procedures before production promotion.
+
+The original local reports retain their original scope and timestamps.
+The subsequent project-owner sandbox results are recorded separately in
+[sandbox execution summary](evidence/sandbox-execution-summary.json).
