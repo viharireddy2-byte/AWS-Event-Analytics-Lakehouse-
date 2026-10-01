@@ -86,5 +86,9 @@
   "aws_acceptance_executed": false,
   "aws_recovery_drills_executed": false,
   "aws_50m_benchmark_executed": false,
-  "github_actions_run_remotely": false
+  "github_actions_run_remotely": false,
+  "subsequent_sandbox_evaluation": {
+    "source": "Project owner supplied results",
+    "report": "evidence/sandbox-execution-summary.json"
+  }
 }
